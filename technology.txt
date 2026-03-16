@@ -1,0 +1,334 @@
+Abstract
+We demonstrate that scaling up language models greatly improves task-agnostic,
+few-shot performance, sometimes even becoming competitive with prior state-of-
+the-art fine-tuning approaches. Specifically, we train GPT-3, an autoregressive
+language model with 175 billion parameters, 10x more than any previous non-
+sparse language model, and test its performance in the few-shot setting. For all
+tasks, GPT-3 is applied without any gradient updates or fine-tuning, with tasks
+and few-shot demonstrations specified purely via text interaction with the model.
+GPT-3 achieves strong performance on many NLP datasets, including translation,
+question-answering, and cloze tasks. We also identify some datasets where GPT-
+3’s few-shot learning still struggles, as well as some datasets where GPT-3 faces
+methodological issues related to training on large web corpora.
+1 Introduction
+NLP has shifted from learning task-specific representations and designing task-specific architectures
+to using task-agnostic pre-training and task-agnostic architectures. This shift has led to substantial
+progress on many challenging NLP tasks such as reading comprehension, question answering, textual
+entailment, among others. Even though the architecture and initial representations are now task-
+agnostic, a final task-specific step remains: fine-tuning on a large dataset of examples to adapt a task
+agnostic model to perform a desired task.
+Recent work [RWC+19] suggested this final step may not be necessary. [RWC+19] demonstrated
+that a single pretrained language model can be zero-shot transferred to perform standard NLP tasks
+∗Equal contribution
+†Johns Hopkins University, OpenAI
+Figure 1.1: Performance on SuperGLUE increases with model size. A value of K = 32 means
+that our model was shown 32 examples per task, for 256 examples total divided across the 8 tasks in
+SuperGLUE. We report GPT-3 values on the dev set, so our numbers are not directly comparable
+to the dotted reference lines (our test set results are in the appendix). The BERT-Large reference
+model was fine-tuned on the SuperGLUE training set (125K examples), whereas BERT++ was first
+fine-tuned on MultiNLI (392K examples) and SWAG (113K examples) before further fine-tuning on
+the SuperGLUE training set (for a total of 630K fine-tuning examples).
+Performance on SuperGLUE increases with number of examples in context. We find the differ-
+ence in performance between the BERT-Large and BERT++ to be roughly equivalent to the difference
+between GPT-3 with one example per context versus eight examples per context.
+Aggregate performance for all 42 accuracy-denominated benchmarks. While zero-shot perfor-
+mance improves steadily with model size, few-shot performance increases more rapidly, demonstrat-
+ing that larger models are more proficient at in-context learning.
+without the need for finetuning on a dataset of training examples. While this work was a promising
+proof of concept, the best case performance only matched some supervised baselines on a single
+dataset. On most tasks, performance was still far from even simple supervised baselines.
+However [RWC+19] also showed a potential way forward. The work observed relatively consistent
+log-linear trends in performance on both transfer tasks and language modeling loss across one an
+order of magnitude of scaling. [KMH+20] then conducted a much more rigorous study of the scaling
+behavior of log loss and confirmed smooth scaling trends. In this work, we empirically test whether
+scaling continues to improve performance by extrapolating the previously identified phenomena
+another two orders of magnitude. We train a 175 billion parameter autoregressive language model,
+which we call GPT-3, and measure its transfer learning abilities.
+As part of this investigation, we also clarify and systematize the approach introduced in [RWC+19].
+While [RWC+19] describe their work as “zero-shot task transfer” they sometimes provide examples
+of the relevant task in the context. Due to the use of what are effectively training examples, these
+cases are better described as “one-shot” or “few-shot” transfer. We study these one-shot and few-shot
+settings in detail comparing them with the zero-shot setting which only uses a natural language
+description or invocation of the task to be performed. Our findings are summarized in Figure 1.1. We
+observe that one- and few-shot performance is often much higher than true zero-shot performance
+leading us to suggest that language models can also be understood as meta-learners where slow
+outer-loop gradient descent based learning is combined with fast “in-context” learning implemented
+within the context activations of the model.
+Broadly, on NLP tasks GPT-3 achieves promising results in the zero- and one-shot settings, and in
+the few-shot setting is sometimes competitive with or even occasionally surpasses state-of-the-art
+(despite state-of-the-art being held by fine-tuned models). For example, GPT-3 achieves 81.5 F1 on
+CoQA in the zero-shot setting, 84.0 F1 on CoQA in the one-shot setting, and 85.0 F1 in the few-shot
+setting. Similarly, GPT-3 achieves 64.3% accuracy on TriviaQA in the zero-shot setting, 68.0% in the
+one-shot setting, and 71.2% in the few-shot setting, the last of which is state-of-the-art relative to
+fine-tuned models operating in the same closed-book setting.
+We additionally train a series of smaller models (ranging from 125 million parameters to 13 billion
+parameters) in order to compare their performance to GPT-3 in the zero-, one- and few-shot settings.
+In general, we find relatively smooth scaling for most tasks with model capacity in all three settings;
+one notable pattern is that the gap between zero-, one-, and few-shot performance often grows with
+model capacity, perhaps suggesting that larger models are more proficient meta-learners.
+2
+2 Approach
+Our basic pre-training approach, including model, data, and training, is similar to the process
+described in [RWC+19], with relatively straightforward scaling up of the model size, dataset size and
+diversity, and length of training. Our use of in-context learning is also similar to [RWC+19], but in
+this work we systematically explore different settings for learning within the context:
+• Fine-Tuning (FT) - updates the weights of a pre-trained model by training on thousands of
+supervised labels specific to the desired task. The main advantage of fine-tuning is strong
+performance on many benchmarks. The main disadvantages are the need for a new large
+dataset for every task, the potential for poor generalization out-of-distribution [MPL19], and
+the potential to exploit spurious features of the training data [GSL+18, NK19]. We focus
+on task-agnostic performance, leaving fine-tuning for future work.
+• Few-Shot (FS) - the model is given a few demonstrations of the task at inference time as
+conditioning [RWC+19], but no weights are updated. An example typically has a context
+and a desired completion (for example an English sentence and the French translation),
+and few-shot works by giving K examples of context and completion, and then one final
+example of context, with the model expected to provide the completion (see appendix for
+more details). We typically set K in the range of 10 to 100, as this is how many examples can
+fit in the model’s context window (nctx = 2048). The main advantage of few-shot is a major
+reduction in the need for task-specific data. The main disadvantage is that results from this
+method have so far been much worse than state-of-the-art fine-tuned models. Also, a small
+amount of task specific data is still required. As indicated by the name, few-shot learning as
+described here for language models is related to few-shot learning as used in other contexts
+in ML [HYC01, VBL+16] – both involve learning based on a broad distribution of tasks
+and then rapidly adapting to a new task.
+• One-Shot (1S) - similar to few-shot but with K = 1.
+• Zero-Shot (0S) - similar to few-shot but with a natural language description of the task
+instead of any examples.
+The appendix includes a demonstration of the four methods using the example of translating English
+to French. While the few-shot results we present in this paper achieve the highest performance,
+one-shot, or even sometimes zero-shot, seem like the fairest comparisons to human performance, and
+are important targets for future work.
+2.1 Model and Architectures
+We use the same model and architecture as GPT-2 [RWC+19], including the modified initialization,
+pre-normalization, and reversible tokenization described therein, with the exception that we use
+alternating dense and locally banded sparse attention patterns in the layers of the transformer, similar
+to the Sparse Transformer [CGRS19]. To study the dependence of ML performance on model size,
+we train 8 different sizes of model, from 125 million parameters to 175 billion parameters, with the
+last being the model we call GPT-3. This range of model sizes allows us to test the scaling laws
+introduced in [KMH+20].
+More details on the sizes and architectures of our models can be found in the appendix. We partition
+each model across GPUs along both the depth and width dimension in order to minimize data-transfer
+between nodes.
+2.2 Training Dataset
+To create our training data, we (1) downloaded and filtered a version of CommonCrawl1 [RSR+19]
+based on similarity to a range of high-quality reference corpora, (2) performed fuzzy deduplication at
+the document level, within and across datasets, to prevent redundancy and preserve the integrity of
+our held-out validation set as an accurate measure of overfitting, and (3) added known high-quality
+reference corpora to the training mix to augment CommonCrawl and increase its diversity. These
+reference corpora include an expanded version of the WebText dataset [RWC+19], collected by
+Table 3.1: Performance on cloze and completion tasks. GPT-3 significantly improves SOTA on
+LAMBADA while achieving respectable performance on two difficult completion prediction datasets.
+a[Tur20] b[RWC+19]c[LDL19] d [LCH+20]
+scraping links over a longer period of time, and first described in [KMH+20], two internet-based
+books corpora (Books1 and Books2) and English-language Wikipedia (details in the appendix).
+2.3 Training Process
+As found in [KMH+20, MKAT18], larger models can typically use a larger batch size, but require
+a smaller learning rate. We measure the gradient noise scale during training and use it to guide
+our choice of batch size [MKAT18]. Table A.1 shows the parameter settings we used. To train the
+larger models without running out of memory, we use a mixture of model parallelism within each
+matrix multiply and model parallelism across the layers of the network. All models were trained on
+V100 GPU’s on part of a high-bandwidth cluster. Details of the training process and hyperparameter
+settings are described in the appendix.
+2.4 Evaluation
+For few-shot learning, we evaluate each example in the evaluation set by randomly drawing K
+examples from that task’s training set as conditioning, delimited by 1 or 2 newlines depending on
+the task. For LAMBADA and Storycloze there is no supervised training set available so we draw
+conditioning examples from the development set and evaluate on the test set.
+For some tasks we use a natural language prompt in addition to (or for K = 0, instead of) demonstra-
+tions. Similar to [RSR+19] we also sometimes change the formatting of answers. See the appendix
+for per-task examples.
+On tasks with free-form completion, we use beam search with the same parameters as [RSR+19]: a
+beam width of 4 and a length penalty of α = 0.6.
+Final results are reported on the test set when publicly available, for each model size and learning
+setting (zero-, one-, and few-shot). When the test set is private, our model is often too large to fit on
+the test server, so we report results on the development set.
+3 Results
+3.1 Language Modeling, Cloze, and Completion Tasks
+We test GPT-3’s performance on the traditional task of language modeling as well as related tasks.
+We calculate zero-shot perplexity on the Penn Tree Bank (PTB) [MKM+94] dataset measured in
+[RWC+19]. We omit the 4 Wikipedia-related tasks and the one-billion word benchmark due to a
+high fraction of these datasets being contained in our training set. Our largest model sets a new SOTA
+on PTB by a substantial margin of 15 points.
+The LAMBADA dataset [PKL+16] requires the model to predict the last word of a paragraph.
+Although [BHT+20] suggested scaling language models is yielding diminishing returns on this
+benchmark, we find that zero-shot GPT-3 achieves a substantive gain of 8% over the previous state-of-
+the-art. For the few-shot setting, we use a fill-in-the-blank format to encourage the language model to
+only generate one word (Alice was friends with Bob. Alice went to visit her friend,. → Bob).
+With this format, GPT-3 achieves an increase of over 18% from the previous state-of-the-art, and
+Table 3.2: Results on three Open-Domain QA tasks. GPT-3 is shown in the few-, one-, and
+zero-shot settings, as compared to prior SOTA results for closed book and open domain settings.
+TriviaQA few-shot result is evaluated on the wiki split test server.
+Table 3.3: GPT-3 results on a selection of QA / RC tasks. CoQA and DROP are F1 while ARC
+reports accuracy. See the appendix for additional experiments.a[KKS+20] b[KKS+20]c[JZC+19]
+d [JN20]
+performance improves smoothly with model size. However, the fill-in-blank method is not effective
+one-shot, where it always performs worse than the zero-shot setting, perhaps because all models
+require several examples to recognize the pattern. An analysis of test set contamination identified that
+a significant minority of the LAMBADA dataset appears to be present in our training data – however
+analysis performed in Section 4 suggests negligible impact on performance.
+The HellaSwag dataset [ZHB+19] involves picking the best ending to a story or set of instructions.
+The examples were adversarially mined to be difficult for language models while remaining easy for
+humans. GPT-3 outperforms a fine-tuned 1.5B parameter language model [ZHR+19] but is still a fair
+amount lower than the overall SOTA achieved by the fine-tuned multi-task model ALUM.
+The StoryCloze 2016 dataset [MCH+16] involves selecting the correct ending sentence for five-
+sentence long stories. Here GPT-3 improves over previous zero-shot results by roughly 10% but is
+overall still 4.1% lower than the fine-tuned SOTA using a BERT based model [LDL19].
+3.2 Question Answering
+In this section we measure GPT-3’s ability to handle a variety of question answering tasks. First, we
+look at datasets involving answering questions about broad factual knowledge. We evaluate in the
+“closed-book” setting (meaning no conditioning information/articles) as suggested by [RRS20]. On
+TriviaQA [JCWZ17], GPT-3 zero-shot already outperforms the fine-tuned T5-11B by 14.2%, and also
+outperforms a version with Q&A tailored span prediction during pre-training by 3.8%. The one-shot
+result improves by 3.7% and matches the SOTA for an open-domain QA system which not only
+fine-tunes but also makes use of a learned retrieval mechanism over a 15.3B parameter dense vector
+index of 21M documents [LPP+20]. GPT-3’s few-shot result further improves performance another
+3.2% beyond this. On Natural Questions (NQs) [KPR+19], GPT-3 underperforms a fine-tuned T5
+11B+SSM. The questions in NQs tend towards fine-grained Wikipedia knowledge which could be
+testing the limits of GPT-3’s capacity and broad pretraining distribution.
+ARC [CCE+18] is a common sense reasoning dataset of multiple-choice questions collected from
+3rd to 9th grade science exams. On the “Challenge” version of the dataset, which has been filtered to
+questions which simple statistical or information retrieval methods are unable to correctly answer,
+GPT-3 approaches the performance of a fine-tuned RoBERTa baseline [KKS+20]. On the “Easy”
+Table 3.4: Few-shot GPT-3 outperforms previous unsupervised NMT work by 5 BLEU
+when translating into English reflecting its strength as an English LM. We report BLEU
+scores on the WMT’14 Fr↔En, WMT’16 De↔En, and WMT’16 Ro↔En datasets as mea-
+sured by multi-bleu.perl with XLM’s tokenization in order to compare most closely with
+prior unsupervised NMT work. SacreBLEUf [Pos18] results reported in the appendix. Under-
+line indicates an unsupervised or few-shot SOTA, bold indicates supervised SOTA with relative
+confidence. a[EOAG18] b[DHKH14]c[WXH+18] d [oR16]e[LGG+20] f [SacreBLEU signature:
+BLEU+case.mixed+numrefs.1+smooth.exp+tok.intl+version.1.2.20]
+version of the dataset, GPT-3 slightly exceeds the same fine-tuned RoBERTa baseline [KKS+20].
+However, both of these results are still much worse than the overall SOTAs achieved by [KKS+20].
+Finally, we evaluate GPT-3 on two reading comprehension datasets. Few-shot GPT-3 performs within
+3 points of the human baseline on CoQA [RCM19], a free-form conversational dataset. On DROP
+[DWD+19], a dataset testing discrete reasoning and numeracy, few-shot GPT-3 outperforms the
+fine-tuned BERT baseline from the original paper but is still well below both human performance and
+state-of-the-art approaches which augment neural networks with symbolic systems [RLL+19].
+3.3 Translation
+In collecting training data for GPT-3, we used the unfiltered distribution of languages reflected
+in internet text datasets (primarily Common Crawl). As a result, although GPT-3’s training data
+primarily consists of English (93% by word count), it also includes 7% non-English content (full list
+at GPT-3 GitHub). Existing unsupervised machine translation approaches often combine pretraining
+on a pair of monolingual datasets with back-translation [SHB15] to bridge the two languages in a
+controlled way. By contrast, GPT-3 learns from a blend of training data that mixes many languages
+together. Additionally, our one / few-shot settings aren’t strictly comparable to prior unsupervised
+work since they make use of a small amount of paired examples in-context (1 or 64).
+Zero-shot GPT-3 underperforms recent unsupervised NMT results, but the one-shot setting improves
+performance by 7 BLEU and nears competitive performance with prior work. Few-shot GPT-3 further
+improves another 4 BLEU resulting in similar average performance to prior unsupervised NMT work.
+For the three input languages studied, GPT-3 significantly outperforms prior unsupervised NMT work
+when translating into English but underperforms when translating in the other direction. Performance
+on En-Ro is a noticeable outlier at over 10 BLEU worse than prior unsupervised NMT work. This
+could be a weakness due to reusing the byte-level BPE tokenizer of GPT-2 which was developed for
+an almost entirely English training dataset. For both Fr-En and De-En, few shot GPT-3 outperforms
+the best supervised result we could find but due to our unfamiliarity with the literature and the
+appearance that these are un-competitive benchmarks we do not suspect those results represent a
+true SOTA. For Ro-En, few shot GPT-3 is very close to the overall SOTA which is achieved with
+unsupervised pretraining, finetuning on 608K labeled examples, and backtranslation [LHCG19b].
+3.4 SuperGLUE
+The SuperGLUE benchmark is a standardized collection of datasets [WPN+19]. In the few-shot
+setting, we used 32 examples for all tasks, sampled randomly from the training set. For all tasks
+except WSC and MultiRC, we sampled a new set of examples to use in the context for each problem.
+For WSC and MultiRC, we used the same set of randomly drawn examples from the training set
+Table 3.5: Performance of GPT-3 on SuperGLUE compared to fine-tuned baselines and SOTA. All
+results are reported on the test set. GPT-3 few-shot is given a total of 32 examples within the context
+of each task and performs no gradient updates.
+as context for all of the problems we evaluated. We sweep values of K up to 32 and note that the
+few-shot SuperGLUE score steadily improves with both model size and with number of examples in
+the context showing increasing benefits from in-context learning (Figure 1.1).
+We observe a wide range in GPT-3’s performance across tasks. On COPA and ReCoRD GPT-3
+achieves near-SOTA performance in the one-shot and few-shot settings, with COPA falling only
+a couple points short and achieving second place on the leaderboard, where first place is held by
+a fine-tuned 11 billion parameter model (T5). On WSC, BoolQ, MultiRC, and RTE, performance
+is reasonable, roughly matching that of a fine-tuned BERT-Large. On CB, we see signs of life at
+75.6% in the few-shot setting. WiC is a notable weak spot with few-shot performance equivalent to
+random chance. We tried a number of different phrasings and formulations for WiC (which involves
+determining if a word is being used with the same meaning in two sentences), none of which was
+able to achieve strong performance. This hints at a phenomenon (which we saw in other experiments
+we ran contained in the Additional Materials) – GPT-3 appears to be weak in the few-shot or one-shot
+setting at some tasks that involve comparing two sentences or snippets. This could also explain the
+comparatively low scores for RTE and CB, which also follow this format. Despite these weaknesses,
+GPT-3 still outperforms a fine-tuned BERT-large on four of eight tasks and on two tasks GPT-3 is
+close to the state-of-the-art held by a fine-tuned 11 billion parameter model.
+4 Measuring and Preventing Memorization Of Benchmarks
+The dataset and model size are about two orders of magnitude larger than those used for GPT-2,
+and include a large amount of Common Crawl, creating increased potential for contamination and
+memorization. On the other hand, precisely due to the large amount of data, even GPT-3 175B does
+not overfit its training set by a significant amount, measured relative to a held-out validation set with
+which it was deduplicated. For each benchmark, we produce a ‘clean’ version which removes all
+potentially leaked examples, defined roughly as examples that have a 13-gram overlap with anything
+in the pretraining set (or that overlap with the whole example when it is shorter than 13-grams). We
+then evaluate GPT-3 on these clean benchmarks, and compare to the original score. If the score on
+the clean subset is similar to the score on the entire dataset, this suggests that contamination, even if
+present, does not have a significant effect on reported results. In most cases performance changes only
+negligibly, and we see no evidence that contamination level and performance difference are correlated.
+We conclude that either our conservative method substantially overestimated contamination or that
+contamination has little effect on performance. We provide full details of the methodology and
+analysis on the most problematic tasks in the appendix.
+7
+5 Limitations
+On text synthesis, GPT-3 samples still sometimes repeat themselves semantically at the document
+level, start to lose coherence over sufficiently long passages, contradict themselves, and occasionally
+contain non-sequitur sentences or paragraphs. Our release repository contains uncurated unconditional
+samples.
+Our experiments do not include any bidirectional architectures or other training objectives such as
+denoising. Our design decision comes at the cost of potentially worse performance on tasks which
+empirically benefit from bidirectionality, such as fill-in-the-blank tasks, tasks that involve looking
+back and comparing two pieces of content (ANLI, WIC), or tasks that require re-reading or carefully
+considering a long passage and then generating a very short answer (QuAC, RACE).
+Our objective weights every token equally and lacks a notion of what is most important to predict
+and what is less important. [RRS20] demonstrate benefits of customizing prediction to entities of
+interest. Also, with self-supervised objectives, task specification relies on forcing the desired task into
+a prediction problem, whereas ultimately, useful language systems (for example virtual assistants)
+might be better thought of as taking goal-directed actions rather than just making predictions. Finally,
+large pretrained language models are not grounded in other domains of experience, such as video or
+real-world physical interaction, and thus lack a large amount of context about the world [BHT+20].
+For all these reasons, scaling pure self-supervised prediction is likely to hit limits, and augmentation
+with a different approach is likely to be necessary. Promising future directions in this vein might
+include learning the objective function from humans [ZSW+19], fine-tuning with reinforcement
+learning, or adding additional modalities such as images to provide grounding and a better model of
+the world [CLY+19].
+GPT-3’s size makes it challenging to deploy. Task-specific distillation [HVD15] merits exploration at
+this new scale.
+6 Related Work
+Several efforts have studied the effect of scale on language model performance. [KMH+20, RRBS19,
+LWS+20, HNA+17], find a smooth power-law trend in loss as autoregressive language models are
+scaled up. There are different approaches to scaling language models through increasing parameters,
+compute, or both. Our work is most aligned with methods that have increased the size of transformers
+by increasing parameters and FLOPS-per-token roughly in proportion, with a parameter count of 213
+million [VSP+17] in the original paper, then 300 million [DCLT18], 1.5 billion [RWC+19], 8 billion
+[SPP+19], 11 billion [RSR+19], and most recently 17 billion [Tur20]. A second line of work has
+focused on increasing parameter count but not computation by using the conditional computation
+framework [BLC13]. Specifically, the mixture-of-experts method [SMM+17] has produced 100
+billion parameter models and 50 billion parameter translation models [AJF19]. One way to decrease
+the computational cost of our models would be to draw from work such as ALBERT [LCG+19] or
+general [HVD15] or task-specific [SDCW19, JYS+19, KR16] approaches to distillation. Lastly, a
+third approach to scale increases computation without increasing parameters through methods like
+adaptive computation time [Gra16] and the universal transformer [DGV+18].
+There are many approaches to building multi-task models. Giving task instructions in natural language
+was first formalized in a supervised setting with [MKXS18] and used in [RWC+19] for in-context
+learning and in [RSR+19] for multi-task fine-tuning. Multi-task learning [Car97] has shown some
+promising initial results [LGH+15, LCR19] and multi-stage fine-tuning has produced SOTA or SOTA-
+competitive results [PFB18, KKS+20]. Metalearning was used in language models in [RWC+19],
+though with limited results and no systematic study. Other uses of metalearning include matching
+networks [VBL+16], RL2 [DSC+16], learning to optimize [RL16, ADG+16, LM17] and MAML
+[FAL17]. Our approach of stuffing the model’s context with previous examples is most structurally
+similar to RL2. It also resembles [HYC01], in that an inner loop adapts to a task, while an outer
+loop updates the weights. Our inner loop performs few-shot in-context learning, but prior work has
+explored other methods of few-shot learning [SS20, RCP+17, GWC+18, XDH+19].
+Finally, Algorithmic innovation in language models over the last two years has been enormous, in-
+cluding denoising-based bidirectionality [DCLT18], prefixLM [DL15], encoder-decoder architectures
+[LLG+19, RSR+19], random permutations during training [YDY+19], architectures for sampling
+8
+efficiency [DYY+19], data and training improvements [LOG+19], and embedding parameters effi-
+ciency [LCG+19]. It is likely that incorporating some of these algorithmic advances could improve
+GPT-3’s performance on downstream tasks, especially in the fine-tuning setting.
+7 Conclusion
+We presented a 175 billion parameter language model which shows strong performance on many
+NLP tasks and benchmarks in the zero-shot, one-shot, and few-shot settings, in some cases nearly
+matching the performance of state-of-the-art fine-tuned systems, as well as generating high-quality
+samples and strong qualitative performance at tasks defined on-the-fly. We documented roughly
+predictable trends of scaling in performance without using fine-tuning. We also discussed the social
+impacts of this class of model. Despite many limitations and weaknesses, these results suggest that
+very large language models may be an important ingredient in the development of adaptable, general
+language systems.
