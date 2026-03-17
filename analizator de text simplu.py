@@ -70,12 +70,35 @@ STOP_WORDS = {
     "un", "o", "a", "ai", "ale", "al", "este", "sunt",
     "să", "mai", "care", "că", "sau", "pentru", "după",
 
-    "the", "and", "of", "to", "is", "in", "on", "for", "with",
-    "as", "by", "at", "from", "that", "this", "it", "be",
-    "are", "was", "were", "been", "being", "have", "has",
-    "had", "do", "does", "did", "but", "if", "or", "because",
-    "about", "into", "over", "after", "before", "between",
-    "during", "without", "within"
+    # Modal verbs & auxiliaries
+"may","might","must","can","could","shall","should","will","would",
+
+# Pronouns
+"i","you","he","she","it","we","they","me","him","her","them",
+"my","your","his","their","our","its","ours","yours","theirs",
+
+# Articles & determiners
+"a","an","the","this","that","these","those",
+
+# Prepositions
+"in","on","at","by","for","with","about","against","between","into",
+"through","during","before","after","above","below","from","up","down",
+"out","off","over","under","again","further","within","without",
+
+# Conjunctions
+"and","or","but","so","because","although","if","while","where","when",
+
+# Common verbs
+"is","are","was","were","be","been","being",
+"have","has","had",
+"do","does","did",
+
+# Very common useless words
+"not","no","yes","very","just","more","most","such","only","own","same",
+"too","than","then","also","even","still","yet",
+
+# Extra (foarte importante pentru tine)
+"may","one","two","first","second","new","many","much"
 }
 
 
