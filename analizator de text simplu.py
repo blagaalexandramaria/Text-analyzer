@@ -76,7 +76,7 @@ STOP_WORDS = {
     # Pronouns
     "i","you","he","she","it","we","they","me","him","her","them",
     "my","your","his","their","our","its","ours","yours","theirs",
-    "which"
+    "which",
 
     # Articles & determiners
     "a","an","the","this","that","these","those",
