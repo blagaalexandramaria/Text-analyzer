@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog
 from collections import Counter
 import matplotlib.pyplot as plt
+from stop_words import STOP_WORDS
 
 
 # ---------------- FILE CHOICE ---------------- #
@@ -35,9 +36,17 @@ def choose_folder():
     root = tk.Tk()
     root.withdraw()
 
-    return filedialog.askdirectory(
-        title="Choose a folder with .txt files"
-    )
+    try:
+        file_path = filedialog.askopenfilename(
+            title = "Choose a text file",
+            filetypes=[("Text files", "*.txt")]
+        )
+        if not file_path:
+            raise FileNotFoundError("No file selected")
+        return file_path
+    except Exception as e:
+        print("Error choosing file:", e)
+        return None
 
 
 # ---------------- TEXT PROCESSING ---------------- #
@@ -61,47 +70,6 @@ def clean_text(text):
 # Splits the cleaned text into individual words
 def extract_words(text):
     return text.split()
-
-
-# Common stop words in Romanian and English
-# These words are ignored in the analysis because they are too frequent
-STOP_WORDS = {
-    "si", "și", "de", "la", "cu", "pe", "din", "in", "în",
-    "un", "o", "a", "ai", "ale", "al", "este", "sunt",
-    "să", "mai", "care", "că", "sau", "pentru", "după",
-
-    # Modal verbs & auxiliaries
-    "may","might","must","can","could","shall","should","will","would",
-
-    # Pronouns
-    "i","you","he","she","it","we","they","me","him","her","them",
-    "my","your","his","their","our","its","ours","yours","theirs",
-    "which",
-
-    # Articles & determiners
-    "a","an","the","this","that","these","those",
-
-    # Prepositions
-    "in","on","at","by","for","with","about","against","between","into",
-    "through","during","before","after","above","below","from","up","down",
-    "out","off","over","under","again","further","within","without",
-
-    # Conjunctions
-    "and","or","but","so","because","although","if","while","where","when",
-
-    # Common verbs
-    "is","are","was","were","be","been","being",
-    "have","has","had",
-    "do","does","did",
-
-    # Very common useless words
-    "not","no","yes","very","just","more","most","such","only","own","same",
-    "too","than","then","also","even","still","yet",
-
-    # Extra (foarte importante pentru tine)
-    "may","one","two","first","second","new","many","much"
-}
-
 
 # Removes stop words and keeps only words with at least 3 letters
 def remove_common_words(words):
@@ -376,6 +344,10 @@ def main():
             print("Different words:", r["different"])
             print("Average length:", round(r["average"], 2))
             print("Longest word:", r["longest"])
+    
+    # invalid mode
+    else:
+        print("Invalid mode selected. Program stopped.")
 
 
 # Runs the program only when this file is executed directly
