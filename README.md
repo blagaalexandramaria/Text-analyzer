@@ -45,6 +45,22 @@ The program can analyze a single `.txt` file or compare multiple files from a fo
 pip install -r requirements.txt
 ```
 ---
+## Project structure
+```bash
+text-analyzer/
+│
+├── images/                 # Image assets
+├── texts/                  # Text data / input files
+│
+├── .gitattributes          # Git configuration
+├── .gitignore              # Ignored files
+├── README.md               # Project documentation
+├── requirements.txt        # Dependencies
+│
+├── stop_words.py           # Stop words handling
+├── text_analyzer.py        # Main analysis logic
+```
+---
 
 ## How the Program Works
 
